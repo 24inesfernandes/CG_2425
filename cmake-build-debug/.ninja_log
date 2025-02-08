@@ -1,0 +1,10 @@
+# ninja log v6
+1	60	1738769802879591489	build.ninja	69daeac7bab40783
+0	590	1738758940134851306	CMakeFiles/CG_2425.dir/main.cpp.o	f79cae638015dfb0
+25	75	1738759248533890326	CG_2425	459f1323c84b9144
+1	592	1738758940135239550	CMakeFiles/CG_2425.dir/generator/generator.cpp.o	2bb02d30abd61b1
+1	646	1738758940135418131	CMakeFiles/CG_2425.dir/generator/model.cpp.o	c47b2be0ed34520b
+0	277	1738769839679889503	generator/CMakeFiles/generator.dir/generator.cpp.o	97b1819edaad2d1c
+1	325	1738769839680829544	generator/CMakeFiles/generator.dir/model.cpp.o	f25b0147f2bf3f4f
+325	343	1738769840004257163	generator/libgenerator.a	7938936addad4a62
+5	59	1738769906825527095	CG_2425	3f68d3ee2777654b

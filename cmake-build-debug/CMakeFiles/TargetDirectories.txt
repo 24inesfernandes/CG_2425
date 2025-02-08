@@ -1,0 +1,6 @@
+/Users/inesfernandes/Desktop/CG_2425/cmake-build-debug/CMakeFiles/CG_2425.dir
+/Users/inesfernandes/Desktop/CG_2425/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/inesfernandes/Desktop/CG_2425/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/inesfernandes/Desktop/CG_2425/cmake-build-debug/generator/CMakeFiles/generator.dir
+/Users/inesfernandes/Desktop/CG_2425/cmake-build-debug/generator/CMakeFiles/edit_cache.dir
+/Users/inesfernandes/Desktop/CG_2425/cmake-build-debug/generator/CMakeFiles/rebuild_cache.dir
