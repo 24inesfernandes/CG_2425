@@ -227,62 +227,57 @@ void parseGroup(XMLElement* groupElement, Group& group) {
     }
 }
 
-// Load a 3D model from file
 bool loadModel(Model& model) {
-    ifstream file(model.filename);
-    if (!file.is_open()) {
-        cerr << "Error opening model file: " << model.filename << endl;
-        return false;
-    }
-    
     // Clear any existing data
     model.vertices.clear();
     model.faces.clear();
     
-    // First line should contain the number of vertices
-    int numVertices;
-    file >> numVertices;
-    
-    // Read vertices
-    for (int i = 0; i < numVertices; i++) {
-        float x, y, z;
-        file >> x >> y >> z;
-        model.vertices.push_back(Vertex(x, y, z));
+    // Tenta abrir como um arquivo XML
+    tinyxml2::XMLDocument doc;
+    if (doc.LoadFile(model.filename.c_str()) != tinyxml2::XML_SUCCESS) {
+        cerr << "Error loading XML file: " << model.filename << endl;
+        return false;
     }
     
-    // Check if file contains face information (triangles)
-    // If not, we assume vertices are specified in triangle order
-    if (file.good()) {
-        int numFaces;
-        if (file >> numFaces) {
-            // Read faces
-            for (int i = 0; i < numFaces; i++) {
-                int v1, v2, v3;
-                file >> v1 >> v2 >> v3;
-                model.faces.push_back(Face(v1, v2, v3));
-            }
-        } else {
-            // No explicit faces, create faces from vertex order
-            for (int i = 0; i < numVertices; i += 3) {
-                if (i + 2 < numVertices) {
-                    model.faces.push_back(Face(i, i + 1, i + 2));
-                }
-            }
-        }
-    } else {
-        // No explicit faces, create faces from vertex order
-        for (int i = 0; i < numVertices; i += 3) {
-            if (i + 2 < numVertices) {
-                model.faces.push_back(Face(i, i + 1, i + 2));
-            }
-        }
+    // Lê modelo no formato XML
+    tinyxml2::XMLElement* rootElement = doc.RootElement();
+    if (!rootElement) {
+        cerr << "Error: No root element in XML file: " << model.filename << endl;
+        return false;
     }
     
-    file.close();
+    // Lê triângulos
+    tinyxml2::XMLElement* triangleElement = rootElement->FirstChildElement("triangle");
+    
+    while (triangleElement) {
+        vector<int> faceVertices;
+        
+        // Lê vértices do triângulo
+        tinyxml2::XMLElement* vertexElement = triangleElement->FirstChildElement("vertex");
+        while (vertexElement && faceVertices.size() < 3) {
+            float x = 0, y = 0, z = 0;
+            vertexElement->QueryFloatAttribute("x", &x);
+            vertexElement->QueryFloatAttribute("y", &y);
+            vertexElement->QueryFloatAttribute("z", &z);
+            
+            // Adiciona o vértice ao modelo
+            model.vertices.push_back(Vertex(x, y, z));
+            faceVertices.push_back(model.vertices.size() - 1);
+            
+            vertexElement = vertexElement->NextSiblingElement("vertex");
+        }
+        
+        // Se tivermos 3 vértices, criamos a face
+        if (faceVertices.size() == 3) {
+            model.faces.push_back(Face(faceVertices[0], faceVertices[1], faceVertices[2]));
+        }
+        
+        triangleElement = triangleElement->NextSiblingElement("triangle");
+    }
     
     model.loaded = true;
-    cout << "Model loaded: " << model.filename << " (" << model.vertices.size() << " vertices, " 
-         << model.faces.size() << " faces)" << endl;
+    cout << "Model loaded: " << model.filename << " (" << model.vertices.size() 
+         << " vertices, " << model.faces.size() << " faces)" << endl;
     
     return true;
 }
