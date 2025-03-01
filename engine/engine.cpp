@@ -7,6 +7,7 @@
 #include <GL/glut.h>
 #include "tinyxml2.h"
 #include "camera.h"
+#include <map>
 
 using namespace std;
 using namespace tinyxml2;
@@ -227,57 +228,95 @@ void parseGroup(XMLElement* groupElement, Group& group) {
     }
 }
 
+// Load a 3D model from file (XML format)
 bool loadModel(Model& model) {
+    ifstream file(model.filename);
+    if (!file.is_open()) {
+        cerr << "Error opening model file: " << model.filename << endl;
+        return false;
+    }
+    
     // Clear any existing data
     model.vertices.clear();
     model.faces.clear();
     
-    // Tenta abrir como um arquivo XML
-    tinyxml2::XMLDocument doc;
-    if (doc.LoadFile(model.filename.c_str()) != tinyxml2::XML_SUCCESS) {
-        cerr << "Error loading XML file: " << model.filename << endl;
+    // Read the entire file content into a string
+    string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+    file.close();
+    
+    // Parse XML content using TinyXML2
+    XMLDocument doc;
+    if (doc.Parse(content.c_str()) != XML_SUCCESS) {
+        cerr << "Error parsing XML in model file: " << model.filename << endl;
         return false;
     }
     
-    // Lê modelo no formato XML
-    tinyxml2::XMLElement* rootElement = doc.RootElement();
+    // Get the root element (should be one of: plane, box, sphere, cone)
+    XMLElement* rootElement = doc.RootElement();
     if (!rootElement) {
-        cerr << "Error: No root element in XML file: " << model.filename << endl;
+        cerr << "No root element found in model file: " << model.filename << endl;
         return false;
     }
     
-    // Lê triângulos
-    tinyxml2::XMLElement* triangleElement = rootElement->FirstChildElement("triangle");
+    // Maps to store vertex indices
+    map<string, int> vertexIndices;
+    int nextIndex = 0;
+    
+    // Process all triangle elements
+    XMLElement* triangleElement = rootElement->FirstChildElement("triangle");
+    int faceCount = 0;
     
     while (triangleElement) {
-        vector<int> faceVertices;
+        XMLElement* vertex1 = triangleElement->FirstChildElement("vertex");
+        XMLElement* vertex2 = vertex1 ? vertex1->NextSiblingElement("vertex") : nullptr;
+        XMLElement* vertex3 = vertex2 ? vertex2->NextSiblingElement("vertex") : nullptr;
         
-        // Lê vértices do triângulo
-        tinyxml2::XMLElement* vertexElement = triangleElement->FirstChildElement("vertex");
-        while (vertexElement && faceVertices.size() < 3) {
-            float x = 0, y = 0, z = 0;
-            vertexElement->QueryFloatAttribute("x", &x);
-            vertexElement->QueryFloatAttribute("y", &y);
-            vertexElement->QueryFloatAttribute("z", &z);
+        if (vertex1 && vertex2 && vertex3) {
+            // Create three vertices for the triangle
+            vector<int> vertexIndicesForTriangle;
             
-            // Adiciona o vértice ao modelo
-            model.vertices.push_back(Vertex(x, y, z));
-            faceVertices.push_back(model.vertices.size() - 1);
+            // Process each vertex of the triangle
+            for (XMLElement* vertex : {vertex1, vertex2, vertex3}) {
+                float x = 0, y = 0, z = 0;
+                vertex->QueryFloatAttribute("x", &x);
+                vertex->QueryFloatAttribute("y", &y);
+                vertex->QueryFloatAttribute("z", &z);
+                
+                // Create a unique key for this vertex
+                string vertexKey = to_string(x) + "," + to_string(y) + "," + to_string(z);
+                
+                // Check if we've seen this vertex before
+                if (vertexIndices.find(vertexKey) == vertexIndices.end()) {
+                    // New vertex, add it to the model
+                    model.vertices.push_back(Vertex(x, y, z));
+                    vertexIndices[vertexKey] = nextIndex;
+                    vertexIndicesForTriangle.push_back(nextIndex);
+                    nextIndex++;
+                } else {
+                    // Existing vertex, reuse its index
+                    vertexIndicesForTriangle.push_back(vertexIndices[vertexKey]);
+                }
+            }
             
-            vertexElement = vertexElement->NextSiblingElement("vertex");
-        }
-        
-        // Se tivermos 3 vértices, criamos a face
-        if (faceVertices.size() == 3) {
-            model.faces.push_back(Face(faceVertices[0], faceVertices[1], faceVertices[2]));
+            // Add the face if we have three valid vertices
+            if (vertexIndicesForTriangle.size() == 3) {
+                model.faces.push_back(Face(
+                    vertexIndicesForTriangle[0],
+                    vertexIndicesForTriangle[1],
+                    vertexIndicesForTriangle[2]
+                ));
+                faceCount++;
+            }
+        } else {
+            cerr << "Triangle missing vertices in model file: " << model.filename << endl;
         }
         
         triangleElement = triangleElement->NextSiblingElement("triangle");
     }
     
     model.loaded = true;
-    cout << "Model loaded: " << model.filename << " (" << model.vertices.size() 
-         << " vertices, " << model.faces.size() << " faces)" << endl;
+    cout << "Model loaded: " << model.filename << " (" << model.vertices.size() << " vertices, " 
+         << faceCount << " faces)" << endl;
     
     return true;
 }
