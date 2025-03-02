@@ -7,6 +7,7 @@
 #include <GL/glut.h>
 #include "tinyxml2.h"
 #include "camera.h"
+#include "parser.h"
 #include <map>
 
 using namespace std;
@@ -28,44 +29,27 @@ struct Face {
     Face(int _v1, int _v2, int _v3) : v1(_v1), v2(_v2), v3(_v3) {}
 };
 
-// Structure to represent a 3D model
-struct Model {
+// Structure to represent a 3D model with vertices and faces
+struct ModelData {
     string filename;
     vector<Vertex> vertices;
     vector<Face> faces;
     
     bool loaded;
     
-    Model() : loaded(false) {}
-};
-
-// Structure for Window settings
-struct Window {
-    int width, height;
-    
-    Window() : width(800), height(600) {}
-};
-
-// Structure for a group node (for Phase 2)
-struct Group {
-    // Will contain transforms in Phase 2
-    vector<Model> models;
-    vector<Group> childGroups;
+    ModelData() : loaded(false) {}
 };
 
 // Global variables
 Window window;
 Camera* camera;
-Group rootGroup;
+vector<ModelData> modelDataList; // List of loaded model data
 
 bool showAxes = false;
 bool wireframeMode = false;
 
 // Function prototypes
-bool parseXMLFile(const string& filename);
-bool loadModel(Model& model);
-void parseGroup(XMLElement* groupElement, Group& group);
-void renderGroup(const Group& group);
+bool loadModel(ModelData& modelData, const string& filename);
 void changeSize(int w, int h);
 void renderScene();
 void drawAxes();
@@ -82,10 +66,21 @@ int main(int argc, char** argv) {
     // Create camera with default values
     camera = new Camera();
     
-    // Parse the XML file
-    if (!parseXMLFile(argv[1])) {
+    // Initialize Group to hold models
+    Group group;
+    
+    // Parse the XML file using SimpleParser
+    if (!SimpleParser::parseXMLFile(argv[1], window, *camera, group)) {
         cerr << "Failed to parse XML file." << endl;
         return 1;
+    }
+    
+    // Load all models from the parsed Group
+    for (const Model& model : group.models) {
+        ModelData modelData;
+        if (loadModel(modelData, model.filename)) {
+            modelDataList.push_back(modelData);
+        }
     }
     
     // Initialize GLUT
@@ -93,7 +88,7 @@ int main(int argc, char** argv) {
     glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
     glutInitWindowPosition(100, 100);
     glutInitWindowSize(window.width, window.height);
-    glutCreateWindow("3D Engine");
+    glutCreateWindow("3D Engine - Phase 1");
     
     // Register callback functions
     glutDisplayFunc(renderScene);
@@ -121,124 +116,20 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-// Parse the XML file using TinyXML2
-bool parseXMLFile(const string& filename) {
-    XMLDocument doc;
-    if (doc.LoadFile(filename.c_str()) != XML_SUCCESS) {
-        cerr << "Error loading XML file: " << filename << endl;
-        return false;
-    }
-    
-    // Get the root element (world)
-    XMLElement* worldElement = doc.FirstChildElement("world");
-    if (!worldElement) {
-        cerr << "Missing 'world' element in XML file." << endl;
-        return false;
-    }
-    
-    // Parse window settings
-    XMLElement* windowElement = worldElement->FirstChildElement("window");
-    if (windowElement) {
-        windowElement->QueryIntAttribute("width", &window.width);
-        windowElement->QueryIntAttribute("height", &window.height);
-    }
-    
-    // Parse camera settings
-    XMLElement* cameraElement = worldElement->FirstChildElement("camera");
-    if (cameraElement) {
-        float posX = 0, posY = 0, posZ = 5;
-        float lookX = 0, lookY = 0, lookZ = 0;
-        float upX = 0, upY = 1, upZ = 0;
-        float fov = 60, near = 1, far = 1000;
-        
-        XMLElement* posElement = cameraElement->FirstChildElement("position");
-        if (posElement) {
-            posElement->QueryFloatAttribute("x", &posX);
-            posElement->QueryFloatAttribute("y", &posY);
-            posElement->QueryFloatAttribute("z", &posZ);
-        }
-        
-        XMLElement* lookAtElement = cameraElement->FirstChildElement("lookAt");
-        if (lookAtElement) {
-            lookAtElement->QueryFloatAttribute("x", &lookX);
-            lookAtElement->QueryFloatAttribute("y", &lookY);
-            lookAtElement->QueryFloatAttribute("z", &lookZ);
-        }
-        
-        XMLElement* upElement = cameraElement->FirstChildElement("up");
-        if (upElement) {
-            upElement->QueryFloatAttribute("x", &upX);
-            upElement->QueryFloatAttribute("y", &upY);
-            upElement->QueryFloatAttribute("z", &upZ);
-        }
-        
-        XMLElement* projElement = cameraElement->FirstChildElement("projection");
-        if (projElement) {
-            projElement->QueryFloatAttribute("fov", &fov);
-            projElement->QueryFloatAttribute("near", &near);
-            projElement->QueryFloatAttribute("far", &far);
-        }
-        
-        // Update camera with parsed values
-        camera->setPosition(posX, posY, posZ);
-        camera->setLookAt(lookX, lookY, lookZ);
-        camera->setUp(upX, upY, upZ);
-        camera->setProjection(fov, near, far);
-    }
-    
-    // Parse groups (recursively)
-    XMLElement* groupElement = worldElement->FirstChildElement("group");
-    if (groupElement) {
-        parseGroup(groupElement, rootGroup);
-    }
-    
-    return true;
-}
-
-// Recursively parse group elements
-void parseGroup(XMLElement* groupElement, Group& group) {
-    // Parse models in this group
-    XMLElement* modelsElement = groupElement->FirstChildElement("models");
-    if (modelsElement) {
-        XMLElement* modelElement = modelsElement->FirstChildElement("model");
-        while (modelElement) {
-            const char* filename = modelElement->Attribute("file");
-            if (filename) {
-                Model model;
-                model.filename = filename;
-                
-                // Load the model
-                if (loadModel(model)) {
-                    group.models.push_back(model);
-                }
-            }
-            
-            modelElement = modelElement->NextSiblingElement("model");
-        }
-    }
-    
-    // Parse child groups (for Phase 2)
-    XMLElement* childGroupElement = groupElement->FirstChildElement("group");
-    while (childGroupElement) {
-        Group childGroup;
-        parseGroup(childGroupElement, childGroup);
-        group.childGroups.push_back(childGroup);
-        
-        childGroupElement = childGroupElement->NextSiblingElement("group");
-    }
-}
-
-// Load a 3D model from file (XML format)
-bool loadModel(Model& model) {
-    ifstream file(model.filename);
+// Load a 3D model from file
+bool loadModel(ModelData& modelData, const string& filename) {
+    ifstream file(filename);
     if (!file.is_open()) {
-        cerr << "Error opening model file: " << model.filename << endl;
+        cerr << "Error opening model file: " << filename << endl;
         return false;
     }
+    
+    // Set filename
+    modelData.filename = filename;
     
     // Clear any existing data
-    model.vertices.clear();
-    model.faces.clear();
+    modelData.vertices.clear();
+    modelData.faces.clear();
     
     // Read the entire file content into a string
     string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
@@ -247,14 +138,14 @@ bool loadModel(Model& model) {
     // Parse XML content using TinyXML2
     XMLDocument doc;
     if (doc.Parse(content.c_str()) != XML_SUCCESS) {
-        cerr << "Error parsing XML in model file: " << model.filename << endl;
+        cerr << "Error parsing XML in model file: " << filename << endl;
         return false;
     }
     
     // Get the root element (should be one of: plane, box, sphere, cone)
     XMLElement* rootElement = doc.RootElement();
     if (!rootElement) {
-        cerr << "No root element found in model file: " << model.filename << endl;
+        cerr << "No root element found in model file: " << filename << endl;
         return false;
     }
     
@@ -288,7 +179,7 @@ bool loadModel(Model& model) {
                 // Check if we've seen this vertex before
                 if (vertexIndices.find(vertexKey) == vertexIndices.end()) {
                     // New vertex, add it to the model
-                    model.vertices.push_back(Vertex(x, y, z));
+                    modelData.vertices.push_back(Vertex(x, y, z));
                     vertexIndices[vertexKey] = nextIndex;
                     vertexIndicesForTriangle.push_back(nextIndex);
                     nextIndex++;
@@ -300,7 +191,7 @@ bool loadModel(Model& model) {
             
             // Add the face if we have three valid vertices
             if (vertexIndicesForTriangle.size() == 3) {
-                model.faces.push_back(Face(
+                modelData.faces.push_back(Face(
                     vertexIndicesForTriangle[0],
                     vertexIndicesForTriangle[1],
                     vertexIndicesForTriangle[2]
@@ -308,106 +199,17 @@ bool loadModel(Model& model) {
                 faceCount++;
             }
         } else {
-            cerr << "Triangle missing vertices in model file: " << model.filename << endl;
+            cerr << "Triangle missing vertices in model file: " << filename << endl;
         }
         
         triangleElement = triangleElement->NextSiblingElement("triangle");
     }
     
-    model.loaded = true;
-    cout << "Model loaded: " << model.filename << " (" << model.vertices.size() << " vertices, " 
+    modelData.loaded = true;
+    cout << "Model loaded: " << filename << " (" << modelData.vertices.size() << " vertices, " 
          << faceCount << " faces)" << endl;
     
     return true;
-}
-
-// Recursively render a group and its children
-void renderGroup(const Group& group) {
-    // In Phase 2, apply transforms here
-    
-    // Render all models in this group
-    for (const Model& model : group.models) {
-        if (!model.loaded) continue;
-        
-        // If model has faces defined, use them for rendering
-        if (!model.faces.empty()) {
-            glBegin(GL_TRIANGLES);
-            for (const Face& face : model.faces) {
-                // Use alternating colors for triangles
-                static int colorToggle = 0;
-                if (colorToggle % 2 == 0) {
-                    glColor3f(0.8f, 0.6f, 0.2f);  // Orange-ish
-                } else {
-                    glColor3f(0.2f, 0.6f, 0.8f);  // Blue-ish
-                }
-                colorToggle++;
-                
-                // Draw the triangle
-                const Vertex& v1 = model.vertices[face.v1];
-                const Vertex& v2 = model.vertices[face.v2];
-                const Vertex& v3 = model.vertices[face.v3];
-                
-                glVertex3f(v1.x, v1.y, v1.z);
-                glVertex3f(v2.x, v2.y, v2.z);
-                glVertex3f(v3.x, v3.y, v3.z);
-            }
-            glEnd();
-        } else {
-            // No faces defined, render vertices directly in triangle order
-            glBegin(GL_TRIANGLES);
-            for (size_t i = 0; i < model.vertices.size(); i += 3) {
-                if (i + 2 < model.vertices.size()) {
-                    // Use alternating colors for triangles
-                    static int colorToggle = 0;
-                    if (colorToggle % 2 == 0) {
-                        glColor3f(0.8f, 0.6f, 0.2f);  // Orange-ish
-                    } else {
-                        glColor3f(0.2f, 0.6f, 0.8f);  // Blue-ish
-                    }
-                    colorToggle++;
-                    
-                    // Draw the triangle
-                    const Vertex& v1 = model.vertices[i];
-                    const Vertex& v2 = model.vertices[i + 1];
-                    const Vertex& v3 = model.vertices[i + 2];
-                    
-                    glVertex3f(v1.x, v1.y, v1.z);
-                    glVertex3f(v2.x, v2.y, v2.z);
-                    glVertex3f(v3.x, v3.y, v3.z);
-                }
-            }
-            glEnd();
-        }
-    }
-    
-    // Recursively render child groups
-    for (const Group& childGroup : group.childGroups) {
-        glPushMatrix();
-        renderGroup(childGroup);
-        glPopMatrix();
-    }
-}
-
-// GLUT reshape function
-void changeSize(int w, int h) {
-    // Prevent division by zero
-    if (h == 0) h = 1;
-    
-    // Compute window's aspect ratio
-    float ratio = w * 1.0f / h;
-    
-    // Set the projection matrix
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    
-    // Set the viewport
-    glViewport(0, 0, w, h);
-    
-    // Set perspective
-    gluPerspective(camera->getFov(), ratio, camera->getNearPlane(), camera->getFarPlane());
-    
-    // Return to modelview matrix
-    glMatrixMode(GL_MODELVIEW);
 }
 
 // Draw coordinate axes
@@ -432,9 +234,32 @@ void drawAxes() {
     glEnd();
 }
 
+// GLUT reshape function
+void changeSize(int w, int h) {
+    // Prevent division by zero
+    if (h == 0) h = 1;
+    
+    // Compute window's aspect ratio
+    float ratio = w * 1.0f / h;
+    
+    // Set the projection matrix
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    
+    // Set the viewport
+    glViewport(0, 0, w, h);
+    
+    // Set perspective
+    gluPerspective(camera->getFov(), ratio, camera->getNearPlane(), camera->getFarPlane());
+    
+    // Return to modelview matrix
+    glMatrixMode(GL_MODELVIEW);
+}
+
 // GLUT display function
 void renderScene() {
     // Clear buffers
+    glDisable(GL_CULL_FACE);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     // Set polygon drawing mode
@@ -453,8 +278,60 @@ void renderScene() {
         drawAxes();
     }
     
-    // Render the scene (starting from root group)
-    renderGroup(rootGroup);
+    // Render all models
+    for (const ModelData& modelData : modelDataList) {
+        if (!modelData.loaded) continue;
+        
+        // If model has faces defined, use them for rendering
+        if (!modelData.faces.empty()) {
+            glBegin(GL_TRIANGLES);
+            for (const Face& face : modelData.faces) {
+                // Use alternating colors for triangles
+                static int colorToggle = 0;
+                if (colorToggle % 2 == 0) {
+                    glColor3f(0.8f, 0.6f, 0.2f);  // Orange-ish
+                } else {
+                    glColor3f(0.2f, 0.6f, 0.8f);  // Blue-ish
+                }
+                colorToggle++;
+                
+                // Draw the triangle
+                const Vertex& v1 = modelData.vertices[face.v1];
+                const Vertex& v2 = modelData.vertices[face.v2];
+                const Vertex& v3 = modelData.vertices[face.v3];
+                
+                glVertex3f(v1.x, v1.y, v1.z);
+                glVertex3f(v2.x, v2.y, v2.z);
+                glVertex3f(v3.x, v3.y, v3.z);
+            }
+            glEnd();
+        } else {
+            // No faces defined, render vertices directly in triangle order
+            glBegin(GL_TRIANGLES);
+            for (size_t i = 0; i < modelData.vertices.size(); i += 3) {
+                if (i + 2 < modelData.vertices.size()) {
+                    // Use alternating colors for triangles
+                    static int colorToggle = 0;
+                    if (colorToggle % 2 == 0) {
+                        glColor3f(0.8f, 0.6f, 0.2f);  // Orange-ish
+                    } else {
+                        glColor3f(0.2f, 0.6f, 0.8f);  // Blue-ish
+                    }
+                    colorToggle++;
+                    
+                    // Draw the triangle
+                    const Vertex& v1 = modelData.vertices[i];
+                    const Vertex& v2 = modelData.vertices[i + 1];
+                    const Vertex& v3 = modelData.vertices[i + 2];
+                    
+                    glVertex3f(v1.x, v1.y, v1.z);
+                    glVertex3f(v2.x, v2.y, v2.z);
+                    glVertex3f(v3.x, v3.y, v3.z);
+                }
+            }
+            glEnd();
+        }
+    }
     
     // Swap buffers
     glutSwapBuffers();
