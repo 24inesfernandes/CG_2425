@@ -7,23 +7,20 @@
 using namespace std;
 namespace fs = std::filesystem;
 
-// Helper function to create directory if it doesn't exist and prepare the file path
-string prepareFilePath(const string& filename) {
+string caminhoFicheiro(const string& filename) {
     string dirPath = "files3d";
     
-    // Create directory if it doesn't exist
     if (!fs::exists(dirPath)) {
         fs::create_directory(dirPath);
     }
     
-    // Combine directory path with filename
+
     return dirPath + "/" + filename;
 }
 
 //Plano
 void generatePlane(float length, int divisions, const string& filename) {
-    // Get the proper file path in the files3d directory
-    string filePath = prepareFilePath(filename);
+    string filePath = caminhoFicheiro(filename);
     
     ofstream file(filePath);
     if (!file.is_open()) {
@@ -71,8 +68,7 @@ void generatePlane(float length, int divisions, const string& filename) {
 
 //Cubo
 void generateBox(float size, int divisions, const string& filename) {
-    // Get the proper file path in the files3d directory
-    string filePath = prepareFilePath(filename);
+    string filePath = caminhoFicheiro(filename);
     
     ofstream file(filePath);
     if (!file.is_open()) {
@@ -85,19 +81,18 @@ void generateBox(float size, int divisions, const string& filename) {
     float halfSize = size / 2.0f;
     float step = size / divisions;
 
-    // For each face of the cube (6 faces: front, back, top, bottom, left, right)
     for (int face = 0; face < 6; face++) {
         for (int i = 0; i < divisions; i++) {
             for (int j = 0; j < divisions; j++) {
                 float x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4;
                 
-                // Calculate step positions
+                // Calcula
                 float u1 = -halfSize + j * step;
                 float u2 = -halfSize + (j + 1) * step;
                 float v1 = -halfSize + i * step;
                 float v2 = -halfSize + (i + 1) * step;
                 
-                // Define vertices based on which face we're processing
+                // Define vertices
                 switch (face) {
                     case 0: // Front face (Z = halfSize)
                         x1 = u1; y1 = v1; z1 = halfSize;
@@ -137,14 +132,14 @@ void generateBox(float size, int divisions, const string& filename) {
                         break;
                 }
 
-                // Triangle 1
+                // Triangulo 1
                 file << "  <triangle>\n";
                 file << "    <vertex x='" << x1 << "' y='" << y1 << "' z='" << z1 << "'/>\n";
                 file << "    <vertex x='" << x3 << "' y='" << y3 << "' z='" << z3 << "'/>\n";
                 file << "    <vertex x='" << x2 << "' y='" << y2 << "' z='" << z2 << "'/>\n";
                 file << "  </triangle>\n";
 
-                // Triangle 2
+                // Triangulo 2
                 file << "  <triangle>\n";
                 file << "    <vertex x='" << x2 << "' y='" << y2 << "' z='" << z2 << "'/>\n";
                 file << "    <vertex x='" << x3 << "' y='" << y3 << "' z='" << z3 << "'/>\n";
@@ -162,8 +157,7 @@ void generateBox(float size, int divisions, const string& filename) {
 
 //Esfera
 void generateSphere(float radius, int slices, int stacks, const string& filename) {
-    // Get the proper file path in the files3d directory
-    string filePath = prepareFilePath(filename);
+    string filePath = caminhoFicheiro(filename);
     
     ofstream file(filePath);
     if (!file.is_open()) {
@@ -221,8 +215,7 @@ void generateSphere(float radius, int slices, int stacks, const string& filename
 
 //Cone
 void generateCone(float radius, float height, int slices, int stacks, const string& filename) {
-    // Get the proper file path in the files3d directory
-    string filePath = prepareFilePath(filename);
+    string filePath = caminhoFicheiro(filename);
     
     ofstream file(filePath);
     if (!file.is_open()) {
@@ -232,12 +225,12 @@ void generateCone(float radius, float height, int slices, int stacks, const stri
 
     file << "<cone>\n";
 
-    // Generate the side of the cone
+    // Generate lado do cone
     for (int i = 0; i < stacks; i++) {
         float y1 = height * i / stacks;
         float y2 = height * (i + 1) / stacks;
         
-        // Calculate radius at each stack level
+        // Calcula raio
         float r1 = radius * (1 - y1 / height);
         float r2 = radius * (1 - y2 / height);
 
@@ -257,7 +250,7 @@ void generateCone(float radius, float height, int slices, int stacks, const stri
             float x4 = r2 * cos(theta2);
             float z4 = r2 * sin(theta2);
 
-            // Skip degenerate triangles at the top of the cone
+
             if (i < stacks - 1 || r2 > 0.0001) {
                 file << "  <triangle>\n";
                 file << "    <vertex x='" << x1 << "' y='" << y1 << "' z='" << z1 << "'/>\n";
@@ -266,7 +259,6 @@ void generateCone(float radius, float height, int slices, int stacks, const stri
                 file << "  </triangle>\n";
             }
 
-            // For the top stack, we might end up with degenerate triangles, so check for that
             if ((i < stacks - 1 || r2 > 0.0001) && (r2 > 0.0001)) {
                 file << "  <triangle>\n";
                 file << "    <vertex x='" << x2 << "' y='" << y1 << "' z='" << z2 << "'/>\n";
@@ -277,7 +269,7 @@ void generateCone(float radius, float height, int slices, int stacks, const stri
         }
     }
 
-    // Generate the base of the cone (circle on XZ plane at y=0)
+    // Generate a base do cone
     for (int j = 0; j < slices; j++) {
         float theta1 = 2 * M_PI * j / slices;
         float theta2 = 2 * M_PI * (j + 1) / slices;
@@ -287,7 +279,7 @@ void generateCone(float radius, float height, int slices, int stacks, const stri
         float x2 = radius * cos(theta2);
         float z2 = radius * sin(theta2);
 
-        // Base triangle (connecting edge points to center)
+        // (conecta os pontos ao centro)
         file << "  <triangle>\n";
         file << "    <vertex x='0' y='0' z='0'/>\n";
         file << "    <vertex x='" << x1 << "' y='0' z='" << z1 << "'/>\n";
