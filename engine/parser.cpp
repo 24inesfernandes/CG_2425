@@ -1,11 +1,10 @@
 #include "parser.h"
 #include <iostream>
-#include <cmath>
 
 using namespace std;
 using namespace tinyxml2;
 
-bool SimpleParser::parseXMLFile(const std::string& filename, Window& window, Camera& camera, Group& rootGroup) {
+bool SimpleParser::parseXMLFile(const std::string& filename, Window& window, Camera& camera, Group& group) {
     XMLDocument doc;
     if (doc.LoadFile(filename.c_str()) != XML_SUCCESS) {
         cerr << "Error loading XML file: " << filename << endl;
@@ -18,14 +17,12 @@ bool SimpleParser::parseXMLFile(const std::string& filename, Window& window, Cam
         return false;
     }
 
-    // Parse window settings
     XMLElement* windowElement = worldElement->FirstChildElement("window");
     if (windowElement) {
         windowElement->QueryIntAttribute("width", &window.width);
         windowElement->QueryIntAttribute("height", &window.height);
     }
 
-    // Parse camera settings - using your existing Camera class
     XMLElement* cameraElement = worldElement->FirstChildElement("camera");
     if (cameraElement) {
         float posX = 0, posY = 0, posZ = 0;
@@ -61,46 +58,36 @@ bool SimpleParser::parseXMLFile(const std::string& filename, Window& window, Cam
             projectionElement->QueryFloatAttribute("far", &far);
         }
 
-        // Set values to your Camera class
         camera.setPosition(posX, posY, posZ);
         camera.setLookAt(lookX, lookY, lookZ);
         camera.setUp(upX, upY, upZ);
         camera.setProjection(fov, near, far);
     }
 
-    // Parse the root group
     XMLElement* groupElement = worldElement->FirstChildElement("group");
     if (groupElement) {
-        parseGroup(groupElement, rootGroup);
+        XMLElement* modelsElement = groupElement->FirstChildElement("models");
+        if (modelsElement) {
+            parseModels(modelsElement, group);
+        }
     }
 
     return true;
 }
 
-void SimpleParser::parseGroup(XMLElement* groupElement, Group& group) {
-    if (!groupElement) return;
-
-    // Parse models in this group
-    XMLElement* modelsElement = groupElement->FirstChildElement("models");
-    if (modelsElement) {
-        XMLElement* modelElement = modelsElement->FirstChildElement("model");
-        while (modelElement) {
-            const char* filename = modelElement->Attribute("file");
-            if (filename) {
-                Model model;
-                model.filename = std::string(filename);
-                group.models.push_back(model);
-            }
-            modelElement = modelElement->NextSiblingElement("model");
+void SimpleParser::parseModels(XMLElement* modelsElement, Group& group) {
+    if (!modelsElement) return;
+    
+    XMLElement* modelElement = modelsElement->FirstChildElement("model");
+    while (modelElement) {
+        const char* filename = modelElement->Attribute("file");
+        if (filename) {
+            Model model;
+            model.filename = std::string(filename);
+            group.models.push_back(model);
+            
+            cout << "Model found: " << model.filename << endl;
         }
-    }
-
-    // Recursively parse child groups
-    XMLElement* childGroupElement = groupElement->FirstChildElement("group");
-    while (childGroupElement) {
-        Group childGroup;
-        parseGroup(childGroupElement, childGroup);
-        group.children.push_back(childGroup);
-        childGroupElement = childGroupElement->NextSiblingElement("group");
+        modelElement = modelElement->NextSiblingElement("model");
     }
 }
