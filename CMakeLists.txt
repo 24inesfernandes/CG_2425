@@ -17,6 +17,8 @@ set(GENERATOR_SOURCES
     generator/generator.cpp
 )
 
+set(OpenGL_GL_PREFERENCE GLVND)
+
 # Find required packages
 find_package(OpenGL REQUIRED)
 find_package(GLUT REQUIRED)

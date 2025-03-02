@@ -83,7 +83,8 @@ void SimpleParser::parseModels(XMLElement* modelsElement, Group& group) {
         const char* filename = modelElement->Attribute("file");
         if (filename) {
             Model model;
-            model.filename = std::string(filename);
+            // Adicionar o prefixo da pasta files3d/ ao nome do ficheiro
+            model.filename = "files3d/" + std::string(filename);
             group.models.push_back(model);
             
             cout << "Model found: " << model.filename << endl;
