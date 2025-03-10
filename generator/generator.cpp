@@ -244,22 +244,27 @@ void generateCone(float radius, float height, int slices, int stacks, const stri
             float x2 = r1 * cos(theta2);
             float z2 = r1 * sin(theta2);
 
-            float x3 = r2 * cos(theta1);
-            float z3 = r2 * sin(theta1);
+            if (i == stacks - 1) {
+                file << "  <triangle>\n";
+                file << "    <vertex x='" << x1 << "' y='" << y1 << "' z='" << z1 << "'/>\n";
+                file << "    <vertex x='" << x2 << "' y='" << y1 << "' z='" << z2 << "'/>\n";
+                file << "    <vertex x='0' y='" << height << "' z='0'/>\n";
+                file << "  </triangle>\n";
+            } else {
 
-            float x4 = r2 * cos(theta2);
-            float z4 = r2 * sin(theta2);
+                float x3 = r2 * cos(theta1);
+                float z3 = r2 * sin(theta1);
+                float x4 = r2 * cos(theta2);
+                float z4 = r2 * sin(theta2);
 
-
-            if (i < stacks - 1 || r2 > 0.0001) {
+                // Triangle 1
                 file << "  <triangle>\n";
                 file << "    <vertex x='" << x1 << "' y='" << y1 << "' z='" << z1 << "'/>\n";
                 file << "    <vertex x='" << x2 << "' y='" << y1 << "' z='" << z2 << "'/>\n";
                 file << "    <vertex x='" << x3 << "' y='" << y2 << "' z='" << z3 << "'/>\n";
                 file << "  </triangle>\n";
-            }
 
-            if ((i < stacks - 1 || r2 > 0.0001) && (r2 > 0.0001)) {
+                // Triangle 2
                 file << "  <triangle>\n";
                 file << "    <vertex x='" << x2 << "' y='" << y1 << "' z='" << z2 << "'/>\n";
                 file << "    <vertex x='" << x4 << "' y='" << y2 << "' z='" << z4 << "'/>\n";
@@ -269,7 +274,7 @@ void generateCone(float radius, float height, int slices, int stacks, const stri
         }
     }
 
-    // Generate a base do cone
+    // Generate the base of the cone
     for (int j = 0; j < slices; j++) {
         float theta1 = 2 * M_PI * j / slices;
         float theta2 = 2 * M_PI * (j + 1) / slices;
@@ -279,7 +284,7 @@ void generateCone(float radius, float height, int slices, int stacks, const stri
         float x2 = radius * cos(theta2);
         float z2 = radius * sin(theta2);
 
-        // (conecta os pontos ao centro)
+        // Create triangle connecting points to center
         file << "  <triangle>\n";
         file << "    <vertex x='0' y='0' z='0'/>\n";
         file << "    <vertex x='" << x1 << "' y='0' z='" << z1 << "'/>\n";
